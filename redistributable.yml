@@ -1,0 +1,148 @@
+# Identity ---------------------------------------------------------------------
+#
+# Id and every GUID under Scripts are generated ONCE and must never change.
+#
+# RedistributableImporter matches an incoming record with
+#   r.Id == record.Id || r.Name == record.Name
+# so a regenerated GUID makes every published release import as a brand new
+# redistributable instead of updating the existing one. Servers would accumulate a
+# duplicate per release, each with its own per-game option values.
+#
+# Generate four fresh GUIDs per repository:
+#   1..5 | ForEach-Object { [guid]::NewGuid().ToString() }
+# Never copy them from a sibling VC++ repository. Two redistributables sharing an
+# Id would overwrite each other on import.
+
+Id: 4c6e84b0-0bc0-40bd-8d5e-a853c728034a
+Name: Visual C++ v11 Redistributable (2012)
+
+# Name carries the years because that is what an administrator searching for a
+# missing dependency will type, and what Programs and Features shows. Keep the
+# repository name short, and set RepositoryName whenever the two differ -- it is
+# what release asset filenames are built from, and Name is used verbatim without
+# it, spaces and parentheses included.
+RepositoryName: VisualCppV11
+
+Description: >
+  The Microsoft Visual C++ 2012 runtime (v11.0), required by games built with the
+  Visual Studio 2012 toolchain -- broadly the 2012 to 2014 release window. Without
+  it a game fails at launch with MSVCR110.dll is missing, MSVCP110.dll was not
+  found, or the same for vccorlib110.dll, vcomp110.dll, vcamp110.dll, atl110.dll
+  or mfc110u.dll. Installs side by side with every other Visual C++ version; it
+  does not replace or supersede them.
+
+Notes: >
+  Microsoft Visual C++ Redistributable is (c) Microsoft Corporation. The installers
+  are redistributed under the Distributable Code grant in the Visual Studio 2012
+  license terms, whose REDIST list names vcredist_x86.exe and vcredist_x64.exe
+  explicitly. They are carried unmodified and under their upstream filenames, which
+  that grant requires. See LICENSES/NOTICE.md for the grant, its conditions, and
+  the standalone EULA clause that sits against it.
+
+# The four-part file version read from the installer's PE resource. Microsoft does
+# document this one (11.0.61030.0, on the page in Source.Url below), unlike the v14
+# line, but it is still read from the file -- that keeps every repository in this
+# family identical and cannot drift from the bytes actually shipped. Carried
+# verbatim; only the git tag is sanitised.
+#
+# 11.0.61030.0 is Update 4, the final Microsoft build of the 2012 runtime. Visual
+# Studio 2012 left extended support on 2023-01-10 and nothing further will ship.
+# Community repacks exist at 11.0.61031.x; those are not Microsoft-served files.
+LastKnownVersion: "11.0.61030.0"
+
+# Payload ----------------------------------------------------------------------
+Source:
+  Mode: download
+
+  # Bespoke. None of Resolve-UpstreamVersion's resolvers fit: there is no release
+  # feed and no reliable version string on any page to regex out. See source.ps1.
+  Resolver: custom
+
+  Url: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+
+  # The download links for this version, from the page above.
+  #
+  # For v14 these are permalinks that always serve the latest build. 2012 is out of
+  # support and pinned to a fixed build, so the scheduled upstream check runs daily
+  # and always reports no change -- that is correct, not broken. It stays in place
+  # in case Microsoft reissues a security update.
+  #
+  # Unlike 2013 and v14 there is no aka.ms permalink for the 2012 packages; these
+  # are raw download.microsoft.com GUID paths. That spares us the locale-suffix trap
+  # the 2013 links carry, but it also means the URL cannot self-heal if Microsoft
+  # reorganises the CDN. source.ps1 already guards that case: it throws when the PE
+  # version reads back empty and reports the byte size, which is what an HTML error
+  # page saved under a .exe name looks like.
+  #
+  # The path segment is not uniform across architectures upstream. x86 and x64 are
+  # documented under VSU_4, with the underscore; VSU_4/vcredist_arm.exe is a 404 and
+  # ARM is only reachable under VSU4. Both spellings serve x86 and x64 identically.
+  # Leave these as Microsoft documents them rather than unifying them.
+  #
+  # ARM is deliberately absent, and NOT for either sibling's reason. The 2012 ARM
+  # installer is at the same 11.0.61030.0 build as the other two, is still served,
+  # and is named in the REDIST grant alongside them -- so neither v14's "x64 already
+  # contains it" nor 2013's "it would mix builds" applies. It is omitted purely
+  # because ARM32 Windows RT is not a LANCommander client target and nothing could
+  # currently select it.
+  #
+  # These keys are the whole per-version delta of this file. Adding a third
+  # architecture here is enough -- source.ps1 iterates whatever is listed, and the
+  # install scripts key off the Architecture option rather than this list.
+  Downloads:
+    x86: https://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x86.exe
+    x64: https://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x64.exe
+
+  # Which installer's PE version stamps the package. Microsoft ships both
+  # architectures at the same version; source.ps1 warns if they ever diverge.
+  VersionFrom: x64
+
+  # Documentation only -- the client scripts cannot read this file, so the same
+  # path is spelled out in Scripts/DetectInstall.ps1 and must be kept in step.
+  #
+  # The subkey under HKLM\SOFTWARE[\WOW6432Node] that records an installed runtime.
+  # It is NOT the same shape across versions:
+  #
+  #   2015-2022 (v14)  Microsoft\VisualStudio\14.0\VC\Runtimes\{x86,x64}
+  #   2013             Microsoft\VisualStudio\12.0\VC\Runtimes\{x86,x64}
+  #   2012             Microsoft\VisualStudio\11.0\VC\Runtimes\{x86,x64}
+  #   2010             Microsoft\VisualStudio\10.0\VC\VCRedist\{x86,x64}
+  #
+  # 2008 and 2005 predate this convention entirely and are detected through the
+  # Windows uninstall registry or by probing for the WinSxS assembly instead.
+  #
+  # Note that 2012 writes BOTH architectures under WOW6432Node on a 64-bit host and
+  # leaves the native path absent altogether -- unlike v14, which mirrors x64 into
+  # both. DetectInstall probes both roots, which is what makes that work.
+  RuntimesSubkey: Microsoft\VisualStudio\11.0\VC\Runtimes
+
+# Configuration ----------------------------------------------------------------
+#
+# A runtime installer has no configuration file. The one option this package
+# exposes -- which architecture to install -- is not upstream's setting at all, it
+# is ours, so there is nothing for a parser to read. Schema.Overlay.yml authors it
+# outright instead.
+ConfigPaths: []
+
+# Scripts ----------------------------------------------------------------------
+#
+# Platforms is set on every client-side script. The Visual C++ runtime is a Windows
+# component and an unset Platforms means "runs everywhere", which would let these
+# run on a Linux client and fail. Package is deliberately left unset: it runs on the
+# server, which may well be Linux.
+Scripts:
+  DetectInstall:
+    Id: a8c5fbc6-c9b4-4813-8f85-5dfe2f49326b
+    Platforms: Windows
+    Description: Reads the installed runtime version out of the registry for each selected architecture.
+  Install:
+    Id: cc62eb07-7f1f-401a-90b8-e5cf7e3aa339
+    Platforms: Windows
+    Description: Runs the Microsoft installer silently for each selected architecture.
+  Uninstall:
+    Id: 4a98ef42-91ea-4533-92ed-4336b97af8a5
+    Platforms: Windows
+    Description: Deliberately does nothing; the runtime is shared machine-wide.
+  Package:
+    Id: a27d6f4f-566b-4bb9-a5d0-6c3f3a478771
+    Description: Server-side updater that tracks this repository's releases.
